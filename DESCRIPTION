@@ -1,0 +1,14 @@
+Package: Lattirl
+Type: Package
+Title: abacus
+Version: 0.1.0
+Date: 01.07.2017
+Author: Marc Schwering
+Maintainer: Marc Schwering <schweringmarc01@gmail.com>
+Depends: R (>= 2.15.0), data.table
+VignetteBuilder: knitr
+Suggests: knitr, rmarkdown, ggplot2, data.table, edgeR, scDD
+Description: Gene expression analysis for scRNA-seq with possible batch effects.
+License: What license is it under?
+LazyData: TRUE
+RoxygenNote: 6.0.1
