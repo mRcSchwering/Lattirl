@@ -17,7 +17,9 @@ expression values with rows as genes and columns as cells}
 \item{FDR}{\code{num} scalar of predicted FDR}
 }
 \value{
-\code{num} for true (corrected) FDR
+list of \code{bool} whether scDD's FDR can be trusted
+        and \code{num} of posterior probability from the flexible 
+        discriminant analysis
 }
 \description{
 Estimate loss of FDR control for scDD using pooled cells and the 
@@ -33,29 +35,21 @@ differentially distributed genes lose control over the false discovery rate
 scDD is moderately robust to this effect, yet quite powerful.
 This function uses your dataset to predict how much scDD underestimates
 the FDR.
-The predicted true FDR is returned (corrected for scDD's FDR control loss).
 
-scDD is one of the most robust method with regard to batch effects
-(when pooling cells).
-If it's loss of FDR control is to high then you need to resort to drastic
-methods such as proposed by A. Lun, Biostatistics, 2017.
-Here, cells are summed up within batches and then edgeR is used with these
-sums.
-That means you effectively have to degrade your single cell experiment
-to a bulk experiment.
+It returns a bool of whether scDD's predicted FDR can be trusted or not.
+This is decided by a classifier based on a flexible discriminant analysis.
 
 If scDD's FDR control is within an acceptable range, we encourage using
-the above mentioned method with edgeR (Lun, 2017) and scDD together.
+the above mentioned method with edgeR and summed up batches (Lun, 2017) 
+and scDD together.
 scDD is quite good at detecting different shapes in distributions while
 edgeR is good at detecting different means.
 }
-\note{
-A linear mixed model is fitted iteratively to each gene, so this
-function can take a while.
-}
 \examples{
 ds <- SimulateData()
-trueFDR <- EstimFDRcontrol(ds$table, ds$pData$batch, ds$pData$group, 0.1)
-trueFDR
-
+res <- EstimFDRcontrol(ds$table, ds$pData$batch, ds$pData$group, 0.1)
+res
+ds <- SimulateData(nCells = 50)
+res <- EstimFDRcontrol(ds$table, ds$pData$batch, ds$pData$group, 0.1)
+res
 }

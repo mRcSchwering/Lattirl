@@ -12,24 +12,15 @@
 #' scDD is moderately robust to this effect, yet quite powerful.
 #' This function uses your dataset to predict how much scDD underestimates
 #' the FDR.
-#' The predicted true FDR is returned (corrected for scDD's FDR control loss).
 #' 
-#' scDD is one of the most robust method with regard to batch effects
-#' (when pooling cells).
-#' If it's loss of FDR control is to high then you need to resort to drastic
-#' methods such as proposed by A. Lun, Biostatistics, 2017.
-#' Here, cells are summed up within batches and then edgeR is used with these
-#' sums.
-#' That means you effectively have to degrade your single cell experiment
-#' to a bulk experiment.
+#' It returns a bool of whether scDD's predicted FDR can be trusted or not.
+#' This is decided by a classifier based on a flexible discriminant analysis.
 #' 
 #' If scDD's FDR control is within an acceptable range, we encourage using
-#' the above mentioned method with edgeR (Lun, 2017) and scDD together.
+#' the above mentioned method with edgeR and summed up batches (Lun, 2017) 
+#' and scDD together.
 #' scDD is quite good at detecting different shapes in distributions while
 #' edgeR is good at detecting different means.
-#' 
-#' @note A linear mixed model is fitted iteratively to each gene, so this
-#' function can take a while.
 #'
 #' @param dt        \code{num} matrix or data.frame of (not log transformed)
 #'                  expression values with rows as genes and columns as cells
@@ -37,15 +28,19 @@
 #' @param groups    vector identifying batches (\code{chr}, or \code{int})
 #' @param FDR       \code{num} scalar of predicted FDR
 #'
-#' @return \code{num} for true (corrected) FDR
+#' @return list of \code{bool} whether scDD's FDR can be trusted
+#'         and \code{num} of posterior probability from the flexible 
+#'         discriminant analysis
 #'
 #' @export
 #' 
 #' @examples 
 #' ds <- SimulateData()
-#' trueFDR <- EstimFDRcontrol(ds$table, ds$pData$batch, ds$pData$group, 0.1)
-#' trueFDR
-#'
+#' res <- EstimFDRcontrol(ds$table, ds$pData$batch, ds$pData$group, 0.1)
+#' res
+#' ds <- SimulateData(nCells = 50)
+#' res <- EstimFDRcontrol(ds$table, ds$pData$batch, ds$pData$group, 0.1)
+#' res
 EstimFDRcontrol <- function(dt, batches, groups, FDR) {
   stopifnot(inherits(dt, "data.frame") || inherits(dt, "matrix"))
   stopifnot(length(batches) == length(groups) && length(groups) == ncol(dt))
@@ -67,7 +62,7 @@ EstimFDRcontrol <- function(dt, batches, groups, FDR) {
   }
   
   # cells/batch
-  n_hat <- ncol(dt) / length(ubatches)
+  n_hat <- as.vector(ncol(dt) / length(ubatches))
   
   # within batch var
   cv <- function(x) sd(x) / mean(x)
@@ -89,23 +84,18 @@ EstimFDRcontrol <- function(dt, batches, groups, FDR) {
   }
   cv_hat_between <- mean(CVs)
   
-  # LMM
-  corrs <- limma::duplicateCorrelation(
-    log(dt + 1), 
-    design = model.matrix(~ 1 + groups), 
-    block = batches
-  )
-  batch_corrs <- corrs$consensus.correlation
+  # mean count
+  mean_count <- mean(as.vector(as.matrix(dt)))
   
   # test scDD
-  df <- data.frame(
+  X <- data.frame(
     n_hat = n_hat,
     cv_hat_within = cv_hat_within,
     cv_hat_between = cv_hat_between,
-    batch_corrs = batch_corrs,
+    mean_count = mean_count,
     predFDR = FDR
   )
-  dm <- xgboost::xgb.DMatrix(data = as.matrix(df))
-  scDDpred <- predict(model.scDD, dm)
-  scDDpred + FDR
+  post <- as.vector(predict(model, X, type = "posterior")[, 2])
+  lab <- post > 0.0008
+  list(use_scDD = lab, posterior = post)
 }
